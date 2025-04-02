@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Бишкуль ЯП</title>
+  <style>
+    :root {
+      --bg-color: #1e1e1e;
+      --editor-bg: #252526;
+      --text-color: #d4d4d4;
+      --keyword-color: #569cd6;
+      --string-color: #ce9178;
+      --number-color: #b5cea8;
+      --comment-color: #6a9955;
+      --error-color: #f44747;
+      --function-color: #dcdcaa;
+    }
+    
+    body {
+      font-family: 'Fira Code', monospace;
+      background: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: var(--keyword-color);
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .editor-container {
+      position: relative;
+    }
+    
+    #code {
+      width: 100%;
+      height: 300px;
+      padding: 15px;
+      background: var(--editor-bg);
+      color: var(--text-color);
+      border: none;
+      border-radius: 4px;
+      resize: vertical;
+      font-size: 14px;
+      tab-size: 4;
+      white-space: pre;
+      margin-bottom: 10px;
+      font-family: 'Fira Code', monospace;
+    }
+    
+    #highlight {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      right: 15px;
+      bottom: 15px;
+      pointer-events: none;
+      white-space: pre;
+      overflow: hidden;
+      color: transparent;
+      z-index: 1;
+      font-family: 'Fira Code', monospace;
+    }
+    
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.3s;
+      margin-right: 10px;
+    }
+    
+    button:hover {
+      background: #1177bb;
+    }
+    
+    #output {
+      background: var(--editor-bg);
+      color: var(--text-color);
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 4px;
+      min-height: 100px;
+      white-space: pre-wrap;
+    }
+    
+    .error {
+      color: var(--error-color);
+    }
+    
+    .examples {
+      margin: 20px 0;
+    }
+    
+    .example-btn {
+      background: #2d2d2d;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .toolbar {
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Язык программирования <span style="color: #ce9178;">Бишкуль</span></h1>
+    
+    <div class="toolbar">
+      <button onclick="run()">Выполнить (Ctrl+Enter)</button>
+      <button onclick="clearCode()">Очистить</button>
+    </div>
+    
+    <div class="editor-container">
+      <textarea id="code" spellcheck="false">// Пример программы на Бишкуль
+функция привет(имя) {
+  вернуть "Привет, " + имя + "!"
+}
+
+x = 10
+если x > 5 {
+  печать(привет("Мир"))
+  печать("x больше 5")
+} иначе {
+  печать("x меньше или равно 5")
+}</textarea>
+      <pre id="highlight"></pre>
+    </div>
+    
+    <div class="examples">
+      <h3>Примеры:</h3>
+      <button class="example-btn" onclick="loadExample(1)">Приветствие</button>
+      <button class="example-btn" onclick="loadExample(2)">Факториал</button>
+      <button class="example-btn" onclick="loadExample(3)">Калькулятор</button>
+    </div>
+    
+    <h3>Вывод:</h3>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    // Библиотека для подсветки синтаксиса
+    function highlightSyntax(code) {
+      // Ключевые слова Бишкуль
+      const keywords = [
+        'функция', 'вернуть', 'если', 'иначе', 
+        'цикл', 'для', 'пока', 'печать'
+      ];
+      
+      // Регулярные выражения для разных типов токенов
+      const patterns = [
+        {
+          regex: new RegExp(`\\b(${keywords.join('|')})\\b`, 'g'),
+          replace: '<span style="color: var(--keyword-color)">$&</span>'
+        },
+        {
+          regex: /"[^"]*"/g,
+          replace: '<span style="color: var(--string-color)">$&</span>'
+        },
+        {
+          regex: /\b\d+\b/g,
+          replace: '<span style="color: var(--number-color)">$&</span>'
+        },
+        {
+          regex: /\/\/.*$/gm,
+          replace: '<span style="color: var(--comment-color)">$&</span>'
+        },
+        {
+          regex: /\(|\)|\{|\}/g,
+          replace: '<span style="color: var(--function-color)">$&</span>'
+        }
+      ];
+      
+      let highlighted = code;
+      
+      // Применяем все правила подсветки
+      patterns.forEach(pattern => {
+        highlighted = highlighted.replace(pattern.regex, pattern.replace);
+      });
+      
+      return highlighted;
+    }
+    
+    // Интерпретатор Бишкуль
+    class Бишкуль {
+      constructor() {
+        this.переменные = {};
+        this.функции = {};
+      }
+      
+      выполнить(код, вывод) {
+        try {
+          const lines = код.split('\n');
+          let i = 0;
+          
+          while (i < lines.length) {
+            let line = lines[i].trim();
+            i++;
+            
+            if (!line || line.startsWith('//')) continue;
+            
+            // Функции
+            if (line.startsWith('функция ')) {
+              const match = line.match(/функция (\w+)\((.*?)\)/);
+              if (!match) throw new Error('Неправильное объявление функции');
+              
+              const имя = match[1];
+              const параметры = match[2].split(',').map(p => p.trim());
+              const тело = [];
+              
+              while (i < lines.length && !lines[i].trim().startsWith('}')) {
+                тело.push(lines[i]);
+                i++;
+              }
+              
+              this.функции[имя] = { параметры, тело };
+              continue;
+            }
+            
+            // Печать
+            if (line.startsWith('печать(')) {
+              const expr = line.match(/печать\((.*?)\)/)[1];
+              const значение = this.вычислить(expr);
+              вывод(значение + '\n');
+              continue;
+            }
+            
+            // Условия
+            if (line.startsWith('если ')) {
+              const условие = line.match(/если (.*?) \{/)[1];
+              if (!this.вычислить(условие)) {
+                // Пропускаем блок если условие ложно
+                let depth = 1;
+                while (i < lines.length && depth > 0) {
+                  if (lines[i].includes('{')) depth++;
+                  if (lines[i].includes('}')) depth--;
+                  i++;
+                }
+              }
+              continue;
+            }
+            
+            // Иначе
+            if (line.startsWith('иначе {')) {
+              // Пропускаем блок иначе, так как условие было истинно
+              let depth = 1;
+              while (i < lines.length && depth > 0) {
+                if (lines[i].includes('{')) depth++;
+                if (lines[i].includes('}')) depth--;
+                i++;
+              }
+              continue;
+            }
+            
+            // Присваивание
+            if (line.includes('=')) {
+              const [имя, значение] = line.split('=').map(s => s.trim());
+              this.переменные[имя] = this.вычислить(значение);
+              continue;
+            }
+          }
+        } catch (e) {
+          вывод('Ошибка: ' + e.message + '\n', true);
+        }
+      }
+      
+      вычислить(выражение) {
+        // Строки
+        if (выражение.startsWith('"') && выражение.endsWith('"')) {
+          return выражение.slice(1, -1);
+        }
+        
+        // Числа
+        if (!isNaN(выражение)) {
+          return Number(выражение);
+        }
+        
+        // Переменные
+        if (this.переменные[выражение] !== undefined) {
+          return this.переменные[выражение];
+        }
+        
+        // Функции
+        const funcMatch = выражение.match(/(\w+)\((.*?)\)/);
+        if (funcMatch && this.функции[funcMatch[1]]) {
+          const func = this.функции[funcMatch[1]];
+          const args = funcMatch[2].split(',').map(a => this.вычислить(a.trim()));
+          
+          // Сохраняем текущие переменные
+          const oldVars = {...this.переменные};
+          
+          // Устанавливаем параметры
+          func.параметры.forEach((param, i) => {
+            this.переменные[param] = args[i];
+          });
+          
+          // Выполняем тело функции
+          let result = null;
+          for (let line of func.тело) {
+            line = line.trim();
+            if (line.startsWith('вернуть ')) {
+              result = this.вычислить(line.substring(8));
+              break;
+            }
+            this.выполнить(line, () => {});
+          }
+          
+          // Восстанавливаем переменные
+          this.переменные = oldVars;
+          
+          return result;
+        }
+        
+        // Арифметика
+        if (выражение.includes('+')) {
+          const [a, b] = выражение.split('+').map(e => this.вычислить(e.trim()));
+          if (typeof a === 'string' || typeof b === 'string') {
+            return String(a) + String(b);
+          }
+          return a + b;
+        }
+        
+        // Сравнения
+        if (выражение.includes('>')) {
+          const [a, b] = выражение.split('>').map(e => this.вычислить(e.trim()));
+          return a > b;
+        }
+        
+        throw new Error(`Неизвестное выражение: ${выражение}`);
+      }
+    }
+    
+    // DOM взаимодействие
+    function updateHighlight() {
+      const code = document.getElementById('code').value;
+      document.getElementById('highlight').innerHTML = highlightSyntax(code)
+        .replace(/\n/g, '<br>')
+        .replace(/ /g, '&nbsp;');
+    }
+    
+    function run() {
+      const code = document.getElementById('code').value;
+      const outputEl = document.getElementById('output');
+      outputEl.innerHTML = '';
+      
+      const интерпретатор = new Бишкуль();
+      
+      интерпретатор.выполнить(code, (text, isError = false) => {
+        const span = document.createElement('span');
+        span.className = isError ? 'error' : '';
+        span.textContent = text;
+        outputEl.appendChild(span);
+      });
+    }
+    
+    function clearCode() {
+      document.getElementById('code').value = '';
+      updateHighlight();
+    }
+    
+    // Примеры
+    const примеры = [
+      `// Простое приветствие
+функция привет(имя) {
+  вернуть "Привет, " + имя + "!"
+}
+
+печать(привет("Бишкуль"))`,
+      
+      `// Рекурсивный факториал
+функция факториал(n) {
+  если n <= 1 {
+    вернуть 1
+  }
+  вернуть n * факториал(n - 1)
+}
+
+печать("5! = " + факториал(5))`,
+      
+      `// Простой калькулятор
+функция сложить(a, b) { вернуть a + b }
+функция умножить(a, b) { вернуть a * b }
+
+x = 10
+y = 5
+печать("Сумма: " + сложить(x, y))
+печать("Произведение: " + умножить(x, y))`
+    ];
+    
+    function loadExample(index) {
+      document.getElementById('code').value = примеры[index - 1];
+      updateHighlight();
+    }
+    
+    // Инициализация
+    document.getElementById('code').addEventListener('input', updateHighlight);
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        run();
+      }
+    });
+    
+    // Первоначальная подсветка
+    updateHighlight();
+  </script>
+</body>
+</html>
